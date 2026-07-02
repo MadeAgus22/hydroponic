@@ -19,7 +19,7 @@ class HydroponicSeeding(models.Model):
         'product.product', 
         string='Nama Sayuran', 
         required=True,
-        domain=[('type', '=', 'consu')]  # Domain opsional: membatasi hanya barang konsumsi/benih
+        domain=[('type', '=', 'consu')] 
     )
     
     start_date = fields.Date(
@@ -31,7 +31,7 @@ class HydroponicSeeding(models.Model):
     duration = fields.Integer(
         string='Durasi (Hari)', 
         required=True, 
-        default=14
+        default=7
     )
     
     qty_seeding = fields.Integer(
