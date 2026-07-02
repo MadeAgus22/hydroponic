@@ -1,0 +1,60 @@
+<odoo>
+  <data>
+    <!-- explicit list view definition -->
+<!--
+    <record model="ir.ui.view" id="hydroponic.list">
+      <field name="name">Hydroponic list</field>
+      <field name="model">hydroponic.hydroponic</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="value"/>
+          <field name="value2"/>
+        </list>
+      </field>
+    </record>
+-->
+
+    <!-- actions opening views on models -->
+<!--
+    <record model="ir.actions.act_window" id="hydroponic.action_window">
+      <field name="name">Hydroponic window</field>
+      <field name="res_model">hydroponic.hydroponic</field>
+      <field name="view_mode">list,form</field>
+    </record>
+-->
+
+    <!-- server action to the one above -->
+<!--
+    <record model="ir.actions.server" id="hydroponic.action_server">
+      <field name="name">Hydroponic server</field>
+      <field name="model_id" ref="model_hydroponic_hydroponic"/>
+      <field name="state">code</field>
+      <field name="code">
+        action = {
+          "type": "ir.actions.act_window",
+          "view_mode": "list,form",
+          "res_model": model._name,
+        }
+      </field>
+    </record>
+-->
+
+    <!-- Top menu item -->
+<!--
+    <menuitem name="Hydroponic" id="hydroponic.menu_root"/>
+-->
+    <!-- menu categories -->
+<!--
+    <menuitem name="Menu 1" id="hydroponic.menu_1" parent="hydroponic.menu_root"/>
+    <menuitem name="Menu 2" id="hydroponic.menu_2" parent="hydroponic.menu_root"/>
+-->
+    <!-- actions -->
+<!--
+    <menuitem name="List" id="hydroponic.menu_1_list" parent="hydroponic.menu_1"
+              action="hydroponic.action_window"/>
+    <menuitem name="Server to list" id="hydroponic" parent="hydroponic.menu_2"
+              action="hydroponic.action_server"/>
+-->
+  </data>
+</odoo>

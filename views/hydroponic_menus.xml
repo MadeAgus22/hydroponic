@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_hydroponic_dashboard_placeholder" model="ir.actions.act_window">
+        <field name="name">Dashboard Produksi</field>
+        <field name="res_model">hydroponic.seeding</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <menuitem id="menu_hydroponic_root" 
+              name="Hydroponic" 
+              sequence="10"/>
+
+    <menuitem id="menu_hydroponic_dashboard" 
+              name="Dashboard" 
+              parent="menu_hydroponic_root" 
+              action="action_hydroponic_dashboard_placeholder" 
+              sequence="10"/>
+
+    <menuitem id="menu_hydroponic_operations" 
+              name="Operasional" 
+              parent="menu_hydroponic_root" 
+              sequence="20"/>
+
+    <menuitem id="menu_hydroponic_seeding" 
+              name="Pembibitan (Seeding)" 
+              parent="menu_hydroponic_operations" 
+              action="action_hydroponic_seeding" 
+              sequence="10"/>
+</odoo>
