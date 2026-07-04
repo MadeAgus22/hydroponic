@@ -19,7 +19,7 @@ class HydroponicSeeding(models.Model):
         'product.product', 
         string='Nama Sayuran', 
         required=True,
-        domain=[('type', '=', 'consu')] 
+        domain=[('product_tmpl_id.is_hydroponic', '=', True)]
     )
     
     start_date = fields.Date(
@@ -107,18 +107,67 @@ class HydroponicSeeding(models.Model):
                 vals['name'] = f"{month_string}/{seq_number}"
                 
         return super(HydroponicSeeding, self).create(vals_list)
+    
     def write(self, vals):
         res = super(HydroponicSeeding, self).write(vals)
-        # Jika status diubah menjadi 'in_progress' (Pembibitan)
+        
+        # Trigger jika status diklik menjadi 'in_progress' (Pembibitan)
         if vals.get('state') == 'in_progress':
             for record in self:
-                # Cek agar tidak terjadi duplikasi data peremajaan
+                # 1. LOGIKA PEREMAJAAN
                 existing = self.env['hydroponic.juvenile'].search([('seeding_id', '=', record.id)])
                 if not existing:
-                    # Otomatis buat data di menu Peremajaan
                     self.env['hydroponic.juvenile'].create({
                         'seeding_id': record.id,
-                        'qty_alive': record.qty_seeding, # Awalnya dianggap hidup semua
+                        'qty_alive': record.qty_seeding, 
                     })
+                
+                # 2. LOGIKA INVENTORY SESUAI STANDAR ODOO (MULTI-COMPANY SAFE)
+                if record.product_id and record.product_id.product_tmpl_id.is_hydroponic:
+                    
+                    # Dapatkan identitas perusahaan yang sedang aktif (PT Semesta Jaya)
+                    current_company = self.env.company
+                    
+                    # Cari Gudang Tujuan yang khusus milik perusahaan ini (atau bersifat global/False)
+                    dest_location = self.env['stock.location'].search([
+                        ('usage', '=', 'internal'),
+                        ('company_id', 'in', [current_company.id, False])
+                    ], limit=1)
+                    
+                    # Cari Gudang Asal (Produksi) yang khusus milik perusahaan ini
+                    src_location = self.env['stock.location'].search([
+                        ('usage', '=', 'production'),
+                        ('company_id', 'in', [current_company.id, False])
+                    ], limit=1)
+                    
+                    # Fallback jika gudang produksi belum ada
+                    if not src_location:
+                        src_location = self.env['stock.location'].search([
+                            ('usage', '=', 'inventory'),
+                            ('company_id', 'in', [current_company.id, False])
+                        ], limit=1)
+                    
+                    # Eksekusi Surat Jalan (Stock Move)
+                    if dest_location and src_location:
+                        move = self.env['stock.move'].sudo().create({
+                            'name': f'Pembibitan Hidroponik - {record.name}',
+                            'product_id': record.product_id.id,
+                            'product_uom_qty': record.qty_seeding,
+                            'product_uom': record.product_id.uom_id.id,
+                            'location_id': src_location.id,
+                            'location_dest_id': dest_location.id,
+                            'company_id': current_company.id, # KUNCI PENYELESAIAN ERROR
+                            'state': 'draft',
+                        })
+                        
+                        # Proses otomatisasi pemindahan barang ala Odoo 18
+                        move._action_confirm()
+                        move._action_assign()
+                        
+                        if hasattr(move, 'picked'):
+                            move.picked = True
+                        move.quantity = record.qty_seeding 
+                        
+                        move._action_done()
+                        
         return res
-    

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_product_template_form_inherit_hydroponic" model="ir.ui.view">
+        <field name="name">product.template.form.inherit.hydroponic</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="stock.view_template_property_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='route_ids']" position="after">
+                <div class="mt-2">
+                    <field name="is_hydroponic" class="oe_inline"/>
+                    <label for="is_hydroponic" string="Hydroponic Route" class="font-weight-bold ml-1"/>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
