@@ -89,3 +89,18 @@ class HydroponicSeeding(models.Model):
                 vals['name'] = f"{month_string}/{seq_number}"
                 
         return super(HydroponicSeeding, self).create(vals_list)
+    
+    def write(self, vals):
+        res = super(HydroponicSeeding, self).write(vals)
+        # Jika status diubah menjadi 'transferred' (Pindah Tanam)
+        if vals.get('state') == 'transferred':
+            for record in self:
+                # Cek agar tidak terjadi duplikasi data peremajaan
+                existing = self.env['hydroponic.juvenile'].search([('seeding_id', '=', record.id)])
+                if not existing:
+                    # Otomatis buat data di menu Peremajaan
+                    self.env['hydroponic.juvenile'].create({
+                        'seeding_id': record.id,
+                        'qty_alive': record.qty_seeding, # Awalnya dianggap hidup semua
+                    })
+        return res

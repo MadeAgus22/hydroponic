@@ -17,6 +17,7 @@
         # 'security/ir.model.access.csv',
         'data/ir_sequence_data.xml',
         'views/hydroponic_seeding_views.xml',
+        'views/hydroponic_juvenile_views.xml',
         'views/hydroponic_menus.xml',
     ],
     'installable': True,

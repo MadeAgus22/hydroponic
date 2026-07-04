@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hydroponic_juvenile_tree" model="ir.ui.view">
+        <field name="name">hydroponic.juvenile.list</field>
+        <field name="model">hydroponic.juvenile</field>
+        <field name="arch" type="xml">
+            <list string="Daftar Peremajaan" create="0">
+                <field name="seeding_id"/>
+                <field name="product_id"/>
+                <field name="estimated_start_date"/>
+                <field name="duration"/>
+                <field name="qty_alive"/>
+                <field name="is_done" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hydroponic_juvenile_form" model="ir.ui.view">
+        <field name="name">hydroponic.juvenile.form</field>
+        <field name="model">hydroponic.juvenile</field>
+        <field name="arch" type="xml">
+            <form string="Form Peremajaan" create="0">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="seeding_id"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Data dari Pembibitan (Read-only)">
+                            <field name="product_id"/>
+                            <field name="estimated_start_date"/>
+                            <field name="qty_seeding"/>
+                        </group>
+                        <group string="Proses Peremajaan">
+                            <field name="qty_dead" readonly="is_done == True"/>
+                            <field name="qty_alive" readonly="is_done == True"/>
+                            <field name="duration" readonly="is_done == True"/>
+                            <field name="is_done" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hydroponic_juvenile" model="ir.actions.act_window">
+        <field name="name">Peremajaan (Juvenile)</field>
+        <field name="res_model">hydroponic.juvenile</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Belum ada data peremajaan.
+            </p><p>
+                Data akan otomatis muncul di sini ketika status pada menu Pembibitan diubah menjadi "Pindah Tanam".
+            </p>
+        </field>
+    </record>
+</odoo>

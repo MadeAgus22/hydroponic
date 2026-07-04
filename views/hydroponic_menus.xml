@@ -26,4 +26,10 @@
               parent="menu_hydroponic_operations" 
               action="action_hydroponic_seeding" 
               sequence="10"/>
+
+    <menuitem id="menu_hydroponic_juvenile" 
+              name="Peremajaan (Juvenile)" 
+              parent="menu_hydroponic_operations" 
+              action="action_hydroponic_juvenile" 
+              sequence="20"/>
 </odoo>
