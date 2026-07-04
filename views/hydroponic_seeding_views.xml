@@ -13,6 +13,7 @@
                 <field name="qty_seeding"/>
                 <field name="state" widget="badge" 
                        decoration-info="state == 'draft'" 
+                       decoration-warning="state == 'in_progress'" 
                        decoration-success="state == 'transferred'" 
                        decoration-danger="state == 'cancel'"/>
             </list>
@@ -25,7 +26,12 @@
         <field name="arch" type="xml">
             <form string="Form Pembibitan">
                 <header>
-                    <field name="state" widget="statusbar" options="{'clickable': '1'}"/>
+                    <button name="action_cancel" type="object" string="Gagal / Cancel" 
+                            class="btn-danger" 
+                            invisible="state in ('transferred', 'cancel')"/>
+                    
+                    <field name="state" widget="statusbar" options="{'clickable': '1'}" 
+                           statusbar_visible="draft,in_progress,transferred"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -49,10 +55,23 @@
         </field>
     </record>
 
+    <record id="view_hydroponic_seeding_search" model="ir.ui.view">
+        <field name="name">hydroponic.seeding.search</field>
+        <field name="model">hydroponic.seeding</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Kode Batch"/>
+                <field name="product_id" string="Nama Sayuran"/>
+                <filter string="Sembunyikan Gagal" name="hide_cancel" domain="[('state', '!=', 'cancel')]"/>
+            </search>
+        </field>
+    </record>
+
     <record id="action_hydroponic_seeding" model="ir.actions.act_window">
         <field name="name">Pembibitan (Seeding)</field>
         <field name="res_model">hydroponic.seeding</field>
         <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_hide_cancel': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Belum ada data pembibitan.

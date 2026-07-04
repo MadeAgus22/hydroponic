@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="1">
-        <record id="seq_hydroponic_seeding_number" model="ir.sequence">
-            <field name="name">Nomor Urut Pembibitan Hidroponik</field>
-            <field name="code">hydroponic.seeding.number</field>
+    <data noupdate="0">
+        <record id="seq_hydroponic_seeding_batch_new" model="ir.sequence">
+            <field name="name">Nomor Urut Batch Pembibitan</field>
+            <field name="code">hydroponic.seeding.batch</field>
             <field name="padding">4</field>
             <field name="number_next">1</field>
             <field name="number_increment">1</field>
