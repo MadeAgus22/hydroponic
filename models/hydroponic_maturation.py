@@ -13,8 +13,6 @@ class HydroponicMaturation(models.Model):
     
     juvenile_product_id = fields.Many2one(related='juvenile_id.juvenile_product_id', string='Sayur Masuk', readonly=True)
     qty_entered = fields.Integer(string='Total Tanaman Masuk', related='juvenile_id.qty_alive', readonly=True)
-    
-    # Indikator Sisa yang belum dimasukkan ke talang mana pun
     qty_unallocated = fields.Integer(string='Sisa Belum Dialokasi', compute='_compute_unallocated')
     
     harvest_product_id = fields.Many2one('product.product', string='Produk Hasil Panen (Inventory)', domain=[('product_tmpl_id.is_hydroponic', '=', True)])
@@ -25,7 +23,9 @@ class HydroponicMaturation(models.Model):
         ('done', 'Selesai Semua')
     ], string='Status', default='draft')
 
-    line_ids = fields.One2many('hydroponic.maturation.line', 'maturation_id', string='Rincian Talang')
+    # 2 Tabel Berbeda untuk Tab 1 dan Tab 2
+    line_ids = fields.One2many('hydroponic.maturation.line', 'maturation_id', string='Alokasi Talang')
+    harvest_line_ids = fields.One2many('hydroponic.harvest.line', 'maturation_id', string='Riwayat Panen')
 
     @api.depends('qty_entered', 'line_ids.qty_transfer')
     def _compute_unallocated(self):
@@ -39,8 +39,6 @@ class HydroponicMaturation(models.Model):
                 raise ValidationError("Anda harus mengalokasikan minimal 1 Talang sebelum memulai proses!")
             
             total_transfer = sum(record.line_ids.mapped('qty_transfer'))
-            
-            # Pengurangan Stok Remaja di Inventory
             company_id = self.env.company.id
             stock_loc = self.env['stock.location'].search([('usage', '=', 'internal'), ('company_id', 'in', [company_id, False])], limit=1)
             prod_loc = self.env['stock.location'].search([('usage', '=', 'production'), ('company_id', 'in', [company_id, False])], limit=1)
@@ -66,104 +64,102 @@ class HydroponicMaturation(models.Model):
 
     def action_mark_done(self):
         for record in self:
-            if any(not line.is_harvested for line in record.line_ids):
-                raise ValidationError("Masih ada Talang yang belum dipanen. Selesaikan semua terlebih dahulu!")
+            if any(not line.is_done for line in record.line_ids):
+                raise ValidationError("Masih ada Talang yang belum dipanen habis. Selesaikan semua terlebih dahulu!")
             record.state = 'done'
 
 
+# ==========================================
+# TAB 1: ALOKASI TALANG
+# ==========================================
 class HydroponicMaturationLine(models.Model):
     _name = 'hydroponic.maturation.line'
-    _description = 'Rincian Panen Per Talang'
+    _description = 'Rincian Alokasi Per Talang'
+    _rec_name = 'talang_id' # Agar namanya muncul sebagai nama Talang di dropdown
 
     maturation_id = fields.Many2one('hydroponic.maturation', ondelete='cascade')
-    talang_id = fields.Many2one('hydroponic.talang', string='Pilih Talang', required=True)
+    talang_id = fields.Many2one('hydroponic.talang', string='Talang', required=True)
     
     transfer_date = fields.Date(string='Tgl Pindah Tanam', default=fields.Date.context_today, required=True)
     qty_transfer = fields.Integer(string='Jml Pindah Tanam', required=True, default=1)
+
+    harvest_line_ids = fields.One2many('hydroponic.harvest.line', 'allocation_id', string='Riwayat Panen')
     
-    harvest_date = fields.Date(string='Tgl Panen')
-    qty_harvested = fields.Integer(string='Jml Panen (Qty)', default=0)
-    qty_failed = fields.Integer(string='Jml Gagal/Mati', default=0)
-    
-    is_harvested = fields.Boolean(string='Ceklist', default=False)
+    qty_harvested = fields.Integer(string='Total Panen', compute='_compute_harvest_totals', store=True)
+    qty_failed = fields.Integer(string='Total Gagal', compute='_compute_harvest_totals', store=True)
+    qty_remaining = fields.Integer(string='Sisa Belum Panen', compute='_compute_harvest_totals', store=True)
+    is_done = fields.Boolean(string='Selesai', compute='_compute_harvest_totals', store=True)
+
+    @api.depends('qty_transfer', 'harvest_line_ids.qty_harvested', 'harvest_line_ids.qty_failed')
+    def _compute_harvest_totals(self):
+        for record in self:
+            h = sum(record.harvest_line_ids.mapped('qty_harvested'))
+            f = sum(record.harvest_line_ids.mapped('qty_failed'))
+            record.qty_harvested = h
+            record.qty_failed = f
+            record.qty_remaining = record.qty_transfer - (h + f)
+            record.is_done = record.qty_remaining <= 0
 
     @api.constrains('talang_id', 'qty_transfer')
     def _check_talang_capacity(self):
-        """ Mencegah pengisian melebihi batas maksimal Master Talang """
         for record in self:
-            lines = self.env['hydroponic.maturation.line'].search([
-                ('talang_id', '=', record.talang_id.id),
-                ('is_harvested', '=', False)
-            ])
-            total_load = sum(lines.mapped('qty_transfer'))
-            if total_load > record.talang_id.capacity:
-                raise ValidationError(f"Talang {record.talang_id.name} Penuh! Kapasitas: {record.talang_id.capacity}, Ingin diisi: {total_load}. Sisa kuota hanya {record.talang_id.remaining_capacity + record.qty_transfer}.")
+            if record.talang_id.remaining_capacity < 0:
+                raise ValidationError(f"Talang {record.talang_id.name} Penuh! Kuota tidak cukup.")
 
-    @api.constrains('qty_transfer')
-    def _check_batch_quota(self):
-        """ Mencegah pemindahan tanaman melebihi sisa dari Peremajaan """
+    @api.constrains('qty_remaining')
+    def _check_qty_remaining(self):
         for record in self:
-            allocated = sum(record.maturation_id.line_ids.mapped('qty_transfer'))
-            if allocated > record.maturation_id.qty_entered:
-                raise ValidationError(f"Total dialokasikan ({allocated}) melebihi jumlah sayur masuk ({record.maturation_id.qty_entered})!")
+            if record.qty_remaining < 0:
+                raise ValidationError(f"Error: Total Input Panen & Gagal di {record.talang_id.name} melebihi jumlah yang ditanam!")
 
-    def write(self, vals):
-        res = super(HydroponicMaturationLine, self).write(vals)
-        
-        # LOGIKA PANEN & PEMISAHAN SISA (SPLIT LINE)
-        if vals.get('is_harvested'):
-            for record in self:
-                total_processed = record.qty_harvested + record.qty_failed
+
+# ==========================================
+# TAB 2: BUKU LOG PANEN (BARU)
+# ==========================================
+class HydroponicHarvestLine(models.Model):
+    _name = 'hydroponic.harvest.line'
+    _description = 'Riwayat Input Panen'
+
+    maturation_id = fields.Many2one('hydroponic.maturation', ondelete='cascade', required=True)
+    allocation_id = fields.Many2one('hydroponic.maturation.line', string='Pilih Talang', required=True, ondelete='cascade')
+    
+    qty_remaining_info = fields.Integer(related='allocation_id.qty_remaining', string='Sisa Sblm Input')
+    
+    harvest_date = fields.Date(string='Tgl Panen', default=fields.Date.context_today, required=True)
+    qty_harvested = fields.Integer(string='Jml Panen (Qty)', required=True, default=0)
+    qty_failed = fields.Integer(string='Jml Gagal/Mati', required=True, default=0)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super(HydroponicHarvestLine, self).create(vals_list)
+        for record in records:
+            if record.qty_harvested <= 0 and record.qty_failed <= 0:
+                raise ValidationError("Jumlah Panen atau Gagal harus diisi minimal 1!")
+            
+            if not record.maturation_id.harvest_product_id:
+                raise ValidationError("Pilih 'Produk Hasil Panen' di formulir utama terlebih dahulu!")
+
+            # Menambah Stok ke Inventory (Hanya untuk tanaman yang berhasil dipanen)
+            if record.qty_harvested > 0:
+                company_id = self.env.company.id
+                stock_loc = self.env['stock.location'].search([('usage', '=', 'internal'), ('company_id', 'in', [company_id, False])], limit=1)
+                prod_loc = self.env['stock.location'].search([('usage', '=', 'production'), ('company_id', 'in', [company_id, False])], limit=1)
                 
-                if total_processed <= 0:
-                    raise ValidationError("Jumlah Panen atau Gagal harus diisi (minimal 1) sebelum mencentang selesai!")
-                
-                if total_processed > record.qty_transfer:
-                    raise ValidationError(f"Total Panen + Gagal ({total_processed}) melebihi jumlah di Talang ({record.qty_transfer})!")
-                
-                # JIKA PANEN SEBAGIAN (Misal: 25 ditanam, 10 dipanen)
-                if total_processed < record.qty_transfer:
-                    remaining = record.qty_transfer - total_processed
-                    
-                    # 1. Buat baris baru untuk sisanya secara otomatis (Tgl Panen kosong)
-                    self.env['hydroponic.maturation.line'].create({
-                        'maturation_id': record.maturation_id.id,
-                        'talang_id': record.talang_id.id,
-                        'transfer_date': record.transfer_date,
-                        'qty_transfer': remaining,
-                        'harvest_date': False,
-                        'qty_harvested': 0,
-                        'qty_failed': 0,
-                        'is_harvested': False,
+                if stock_loc and prod_loc:
+                    move_in = self.env['stock.move'].sudo().create({
+                        'name': f'Panen {record.allocation_id.talang_id.name} - {record.maturation_id.batch_name}',
+                        'product_id': record.maturation_id.harvest_product_id.id,
+                        'product_uom_qty': record.qty_harvested,
+                        'product_uom': record.maturation_id.harvest_product_id.uom_id.id,
+                        'location_id': prod_loc.id,
+                        'location_dest_id': stock_loc.id,
+                        'company_id': company_id,
+                        'state': 'draft',
                     })
-                    
-                    # 2. Update baris saat ini menjadi persis sebesar yang diproses
-                    record.qty_transfer = total_processed
+                    move_in._action_confirm()
+                    move_in._action_assign()
+                    if hasattr(move_in, 'picked'): move_in.picked = True
+                    move_in.quantity = record.qty_harvested
+                    move_in._action_done()
 
-                # STOCK MOVE (Penambahan ke Inventory)
-                if record.qty_harvested > 0:
-                    if not record.maturation_id.harvest_product_id:
-                        raise ValidationError("Pilih 'Produk Hasil Panen' di formulir atas terlebih dahulu!")
-
-                    company_id = self.env.company.id
-                    stock_loc = self.env['stock.location'].search([('usage', '=', 'internal'), ('company_id', 'in', [company_id, False])], limit=1)
-                    prod_loc = self.env['stock.location'].search([('usage', '=', 'production'), ('company_id', 'in', [company_id, False])], limit=1)
-                    
-                    if stock_loc and prod_loc:
-                        move_in = self.env['stock.move'].sudo().create({
-                            'name': f'Panen {record.talang_id.name} - {record.maturation_id.batch_name}',
-                            'product_id': record.maturation_id.harvest_product_id.id,
-                            'product_uom_qty': record.qty_harvested,
-                            'product_uom': record.maturation_id.harvest_product_id.uom_id.id,
-                            'location_id': prod_loc.id,
-                            'location_dest_id': stock_loc.id,
-                            'company_id': company_id,
-                            'state': 'draft',
-                        })
-                        move_in._action_confirm()
-                        move_in._action_assign()
-                        if hasattr(move_in, 'picked'): move_in.picked = True
-                        move_in.quantity = record.qty_harvested
-                        move_in._action_done()
-
-        return res
+        return records

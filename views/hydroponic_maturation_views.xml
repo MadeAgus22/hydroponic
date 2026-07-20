@@ -63,32 +63,36 @@
                     <notebook>
                         <page string="Tab 1: Alokasi Pindah Tanam">
                             <field name="line_ids" readonly="state == 'done'" context="{'default_transfer_date': context_today()}">
-                                <list editable="bottom" decoration-muted="is_harvested == True">
-                                    <field name="talang_id" options="{'no_create': True}" readonly="is_harvested == True" 
+                                <!-- Baris akan berwarna hijau jika sudah selesai (Sisa = 0) -->
+                                <list editable="bottom" decoration-success="is_done == True">
+                                    <field name="talang_id" options="{'no_create': True}" readonly="is_done == True"
                                            domain="['|', ('remaining_capacity', '&gt;', 0), ('id', '=', talang_id)]"/>
-                                    <field name="transfer_date" readonly="is_harvested == True"/>
-                                    <field name="qty_transfer" readonly="is_harvested == True" sum="Total Alokasi"/>
-                                    <field name="is_harvested" column_invisible="True"/>
+                                    <field name="transfer_date" readonly="is_done == True"/>
+                                    <field name="qty_transfer" readonly="is_done == True" sum="Total Alokasi"/>
+                                    
+                                    <!-- Informasi Sisa untuk memantau -->
+                                    <field name="qty_harvested" readonly="1" optional="show"/>
+                                    <field name="qty_remaining" readonly="1" string="Sisa Blm Panen" decoration-danger="qty_remaining &gt; 0" decoration-success="qty_remaining == 0"/>
+                                    <field name="is_done" column_invisible="True"/>
                                 </list>
                             </field>
                         </page>
+                        
                         <page string="Tab 2: Input Panen" invisible="state == 'draft'">
-                            <field name="line_ids" readonly="state == 'done'">
-                                <list editable="bottom" decoration-muted="is_harvested == True" create="0">
-                                    <!-- Bagian kiri readonly karena diambil dari Tab 1 -->
-                                    <field name="talang_id" readonly="1"/>
-                                    <field name="transfer_date" readonly="1"/>
-                                    <field name="qty_transfer" readonly="1" string="Jml Tersedia"/>
+                            <field name="harvest_line_ids" readonly="state == 'done'">
+                                <list editable="bottom">
+                                    <!-- Filter: Hanya memunculkan Talang dari batch ini yang sisanya belum 0 -->
+                                    <field name="allocation_id" options="{'no_create': True}" 
+                                           domain="[('maturation_id', '=', parent.id), ('is_done', '=', False)]"/>
                                     
-                                    <!-- Bagian kanan untuk input panen -->
-                                    <field name="harvest_date" readonly="is_harvested == True"/>
-                                    <field name="qty_harvested" readonly="is_harvested == True"/>
-                                    <field name="qty_failed" readonly="is_harvested == True"/>
-                                    <field name="is_harvested" widget="boolean_toggle"/>
+                                    <field name="qty_remaining_info" readonly="1" decoration-info="1"/>
+                                    <field name="harvest_date"/>
+                                    <field name="qty_harvested" sum="Total Panen"/>
+                                    <field name="qty_failed" sum="Total Gagal"/>
                                 </list>
                             </field>
                             <p class="text-muted mt-2">
-                                <em>Info: Jika Anda hanya memanen sebagian, sistem otomatis akan memecah sisa tanaman menjadi baris baru yang belum dipanen.</em>
+                                <em>Klik "Add a line" berkali-kali untuk memasukkan riwayat panen pada hari yang berbeda. Kuota Master Talang akan otomatis bertambah kembali setiap kali ada panen (Sisa berkurang).</em>
                             </p>
                         </page>
                     </notebook>
