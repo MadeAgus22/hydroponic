@@ -61,7 +61,7 @@
                     
                     <!-- TAB TERPISAH: Alokasi & Panen -->
                     <notebook>
-                        <page string="Tab 1: Alokasi Pindah Tanam">
+                        <page string="Alokasi Pindah Tanam">
                             <field name="line_ids" readonly="state == 'done'" context="{'default_transfer_date': context_today()}">
                                 <!-- Baris akan berwarna hijau jika sudah selesai (Sisa = 0) -->
                                 <list editable="bottom" decoration-success="is_done == True">
@@ -78,7 +78,7 @@
                             </field>
                         </page>
                         
-                        <page string="Tab 2: Input Panen" invisible="state == 'draft'">
+                        <page string="Input Panen" invisible="state == 'draft'">
                             <field name="harvest_line_ids" readonly="state == 'done'">
                                 <list editable="bottom">
                                     <!-- Filter: Hanya memunculkan Talang dari batch ini yang sisanya belum 0 -->
