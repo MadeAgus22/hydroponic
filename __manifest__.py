@@ -18,8 +18,10 @@
         'data/ir_sequence_data.xml',
         'views/hydroponic_seeding_views.xml',
         'views/hydroponic_juvenile_views.xml',
+        'views/hydroponic_maturation_views.xml',
         'views/product_template_views.xml',
         'views/hydroponic_menus.xml',
+        
     ],
     'installable': True,
     'application': True,

@@ -32,4 +32,21 @@
               parent="menu_hydroponic_operations" 
               action="action_hydroponic_juvenile" 
               sequence="20"/>
+
+    <menuitem id="menu_hydroponic_maturation" 
+              name="Pendewasaan &amp; Panen" 
+              parent="menu_hydroponic_operations" 
+              action="action_hydroponic_maturation" 
+              sequence="30"/>
+
+    <menuitem id="menu_hydroponic_configuration" 
+              name="Konfigurasi" 
+              parent="menu_hydroponic_root" 
+              sequence="100"/>
+
+    <menuitem id="menu_hydroponic_talang" 
+              name="Master Talang" 
+              parent="menu_hydroponic_configuration" 
+              action="action_hydroponic_talang" 
+              sequence="10"/>
 </odoo>

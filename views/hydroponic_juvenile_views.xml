@@ -7,6 +7,7 @@
             <list string="Daftar Peremajaan" create="0">
                 <field name="seeding_id"/>
                 <field name="product_id"/>
+                <field name="juvenile_product_id"/>
                 <field name="estimated_start_date"/>
                 <field name="duration"/>
                 <field name="qty_alive"/>
@@ -33,9 +34,11 @@
                             <field name="qty_seeding"/>
                         </group>
                         <group string="Proses Peremajaan">
-                            <field name="qty_dead" readonly="is_done == True"/>
-                            <field name="qty_alive" readonly="is_done == True"/>
-                            <field name="duration" readonly="is_done == True"/>
+                            <field name="juvenile_product_id" placeholder="Pilih sayur hasil peremajaan..." 
+                                   readonly="is_done == True" force_save="1"/>
+                            <field name="qty_dead" readonly="is_done == True" force_save="1"/>
+                            <field name="qty_alive" readonly="is_done == True" force_save="1"/>
+                            <field name="duration" readonly="is_done == True" force_save="1"/>
                             <field name="is_done" widget="boolean_toggle"/>
                         </group>
                     </group>
