@@ -8,19 +8,16 @@ class HydroponicMaturation(models.Model):
     _order = 'id desc'
     _rec_name = 'batch_name'
 
-    juvenile_id = fields.Many2one('hydroponic.juvenile', string='Referensi Peremajaan', required=True, ondelete='cascade', readonly=True)
+    juvenile_id = fields.Many2one('hydroponic.juvenile', string='Ref Peremajaan', required=True, ondelete='cascade', readonly=True)
     batch_name = fields.Char(related='juvenile_id.seeding_id.name', string='Kode Batch', readonly=True)
     
-    # Produk asal (mengurangi stok)
     juvenile_product_id = fields.Many2one(related='juvenile_id.juvenile_product_id', string='Sayur Masuk', readonly=True)
     qty_entered = fields.Integer(string='Total Tanaman Masuk', related='juvenile_id.qty_alive', readonly=True)
     
-    # Produk tujuan (menambah stok panen)
-    harvest_product_id = fields.Many2one(
-        'product.product', 
-        string='Produk Hasil Panen (Inventory)', 
-        domain=[('product_tmpl_id.is_hydroponic', '=', True)]
-    )
+    # Indikator Sisa yang belum dimasukkan ke talang mana pun
+    qty_unallocated = fields.Integer(string='Sisa Belum Dialokasi', compute='_compute_unallocated')
+    
+    harvest_product_id = fields.Many2one('product.product', string='Produk Hasil Panen (Inventory)', domain=[('product_tmpl_id.is_hydroponic', '=', True)])
 
     state = fields.Selection([
         ('draft', 'Belum Masuk Talang'),
@@ -28,18 +25,22 @@ class HydroponicMaturation(models.Model):
         ('done', 'Selesai Semua')
     ], string='Status', default='draft')
 
-    # Relasi ke sub-tabel Talang
-    line_ids = fields.One2many('hydroponic.maturation.line', 'maturation_id', string='Alokasi & Panen Talang')
+    line_ids = fields.One2many('hydroponic.maturation.line', 'maturation_id', string='Rincian Talang')
+
+    @api.depends('qty_entered', 'line_ids.qty_transfer')
+    def _compute_unallocated(self):
+        for record in self:
+            allocated = sum(record.line_ids.mapped('qty_transfer'))
+            record.qty_unallocated = record.qty_entered - allocated
 
     def action_start_process(self):
-        """ Tombol untuk memulai proses dan memotong stok peremajaan """
         for record in self:
             if not record.line_ids:
-                raise ValidationError("Anda harus menambahkan minimal 1 Talang sebelum memulai proses!")
+                raise ValidationError("Anda harus mengalokasikan minimal 1 Talang sebelum memulai proses!")
             
             total_transfer = sum(record.line_ids.mapped('qty_transfer'))
             
-            # Pengurangan Stok Remaja
+            # Pengurangan Stok Remaja di Inventory
             company_id = self.env.company.id
             stock_loc = self.env['stock.location'].search([('usage', '=', 'internal'), ('company_id', 'in', [company_id, False])], limit=1)
             prod_loc = self.env['stock.location'].search([('usage', '=', 'production'), ('company_id', 'in', [company_id, False])], limit=1)
@@ -74,70 +75,95 @@ class HydroponicMaturationLine(models.Model):
     _name = 'hydroponic.maturation.line'
     _description = 'Rincian Panen Per Talang'
 
-    maturation_id = fields.Many2one('hydroponic.maturation', string='Maturation Ref', ondelete='cascade')
+    maturation_id = fields.Many2one('hydroponic.maturation', ondelete='cascade')
+    talang_id = fields.Many2one('hydroponic.talang', string='Pilih Talang', required=True)
     
-    # Domain: Hanya munculkan talang yang statusnya 'Tersedia' atau yang sudah terlanjur dipilih di baris ini
-    talang_id = fields.Many2one('hydroponic.talang', string='Pilih Talang', required=True, 
-                                domain="['|', ('status', '=', 'available'), ('id', '=', talang_id)]")
-    
+    transfer_date = fields.Date(string='Tgl Pindah Tanam', default=fields.Date.context_today, required=True)
     qty_transfer = fields.Integer(string='Jml Pindah Tanam', required=True, default=1)
     
-    # Kolom Input Panen
     harvest_date = fields.Date(string='Tgl Panen')
-    qty_harvested = fields.Integer(string='Hasil Panen (Qty/Kg)', default=0)
+    qty_harvested = fields.Integer(string='Jml Panen (Qty)', default=0)
     qty_failed = fields.Integer(string='Jml Gagal/Mati', default=0)
     
-    is_harvested = fields.Boolean(string='Selesai (Ceklist Panen)', default=False)
+    is_harvested = fields.Boolean(string='Ceklist', default=False)
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        """ Otomatis mengunci talang saat dipilih agar tidak dibooking batch lain """
-        lines = super(HydroponicMaturationLine, self).create(vals_list)
-        for line in lines:
-            if line.talang_id:
-                line.talang_id.status = 'in_use'
-        return lines
+    @api.constrains('talang_id', 'qty_transfer')
+    def _check_talang_capacity(self):
+        """ Mencegah pengisian melebihi batas maksimal Master Talang """
+        for record in self:
+            lines = self.env['hydroponic.maturation.line'].search([
+                ('talang_id', '=', record.talang_id.id),
+                ('is_harvested', '=', False)
+            ])
+            total_load = sum(lines.mapped('qty_transfer'))
+            if total_load > record.talang_id.capacity:
+                raise ValidationError(f"Talang {record.talang_id.name} Penuh! Kapasitas: {record.talang_id.capacity}, Ingin diisi: {total_load}. Sisa kuota hanya {record.talang_id.remaining_capacity + record.qty_transfer}.")
+
+    @api.constrains('qty_transfer')
+    def _check_batch_quota(self):
+        """ Mencegah pemindahan tanaman melebihi sisa dari Peremajaan """
+        for record in self:
+            allocated = sum(record.maturation_id.line_ids.mapped('qty_transfer'))
+            if allocated > record.maturation_id.qty_entered:
+                raise ValidationError(f"Total dialokasikan ({allocated}) melebihi jumlah sayur masuk ({record.maturation_id.qty_entered})!")
 
     def write(self, vals):
-        """ Memicu penambahan stok jika dichecklist panen per talang """
         res = super(HydroponicMaturationLine, self).write(vals)
+        
+        # LOGIKA PANEN & PEMISAHAN SISA (SPLIT LINE)
         if vals.get('is_harvested'):
             for record in self:
-                if record.qty_harvested <= 0:
-                    raise ValidationError(f"Jumlah panen untuk {record.talang_id.name} harus lebih dari 0!")
-                if not record.maturation_id.harvest_product_id:
-                    raise ValidationError("Pilih 'Produk Hasil Panen' di formulir atas terlebih dahulu!")
+                total_processed = record.qty_harvested + record.qty_failed
                 
-                # Penambahan Stok Panen
-                company_id = self.env.company.id
-                stock_loc = self.env['stock.location'].search([('usage', '=', 'internal'), ('company_id', 'in', [company_id, False])], limit=1)
-                prod_loc = self.env['stock.location'].search([('usage', '=', 'production'), ('company_id', 'in', [company_id, False])], limit=1)
+                if total_processed <= 0:
+                    raise ValidationError("Jumlah Panen atau Gagal harus diisi (minimal 1) sebelum mencentang selesai!")
                 
-                if stock_loc and prod_loc:
-                    move_in = self.env['stock.move'].sudo().create({
-                        'name': f'Panen {record.talang_id.name} - {record.maturation_id.batch_name}',
-                        'product_id': record.maturation_id.harvest_product_id.id,
-                        'product_uom_qty': record.qty_harvested,
-                        'product_uom': record.maturation_id.harvest_product_id.uom_id.id,
-                        'location_id': prod_loc.id,
-                        'location_dest_id': stock_loc.id,
-                        'company_id': company_id,
-                        'state': 'draft',
+                if total_processed > record.qty_transfer:
+                    raise ValidationError(f"Total Panen + Gagal ({total_processed}) melebihi jumlah di Talang ({record.qty_transfer})!")
+                
+                # JIKA PANEN SEBAGIAN (Misal: 25 ditanam, 10 dipanen)
+                if total_processed < record.qty_transfer:
+                    remaining = record.qty_transfer - total_processed
+                    
+                    # 1. Buat baris baru untuk sisanya secara otomatis (Tgl Panen kosong)
+                    self.env['hydroponic.maturation.line'].create({
+                        'maturation_id': record.maturation_id.id,
+                        'talang_id': record.talang_id.id,
+                        'transfer_date': record.transfer_date,
+                        'qty_transfer': remaining,
+                        'harvest_date': False,
+                        'qty_harvested': 0,
+                        'qty_failed': 0,
+                        'is_harvested': False,
                     })
-                    move_in._action_confirm()
-                    move_in._action_assign()
-                    if hasattr(move_in, 'picked'): move_in.picked = True
-                    move_in.quantity = record.qty_harvested
-                    move_in._action_done()
-                
-                # Otomatis melepaskan talang agar bisa dipakai oleh Batch berikutnya
-                record.talang_id.status = 'available'
-                if not record.harvest_date:
-                    record.harvest_date = fields.Date.context_today(self)
-        
-        # Jika ceklis dihilangkan (batal panen), kunci talang kembali
-        if 'is_harvested' in vals and not vals.get('is_harvested'):
-            for record in self:
-                record.talang_id.status = 'in_use'
+                    
+                    # 2. Update baris saat ini menjadi persis sebesar yang diproses
+                    record.qty_transfer = total_processed
+
+                # STOCK MOVE (Penambahan ke Inventory)
+                if record.qty_harvested > 0:
+                    if not record.maturation_id.harvest_product_id:
+                        raise ValidationError("Pilih 'Produk Hasil Panen' di formulir atas terlebih dahulu!")
+
+                    company_id = self.env.company.id
+                    stock_loc = self.env['stock.location'].search([('usage', '=', 'internal'), ('company_id', 'in', [company_id, False])], limit=1)
+                    prod_loc = self.env['stock.location'].search([('usage', '=', 'production'), ('company_id', 'in', [company_id, False])], limit=1)
+                    
+                    if stock_loc and prod_loc:
+                        move_in = self.env['stock.move'].sudo().create({
+                            'name': f'Panen {record.talang_id.name} - {record.maturation_id.batch_name}',
+                            'product_id': record.maturation_id.harvest_product_id.id,
+                            'product_uom_qty': record.qty_harvested,
+                            'product_uom': record.maturation_id.harvest_product_id.uom_id.id,
+                            'location_id': prod_loc.id,
+                            'location_dest_id': stock_loc.id,
+                            'company_id': company_id,
+                            'state': 'draft',
+                        })
+                        move_in._action_confirm()
+                        move_in._action_assign()
+                        if hasattr(move_in, 'picked'): move_in.picked = True
+                        move_in.quantity = record.qty_harvested
+                        move_in._action_done()
 
         return res
