@@ -19,7 +19,6 @@ class HydroponicMaturation(models.Model):
     harvest_product_id = fields.Many2one(
         'product.product', 
         string='Produk Hasil Panen (Inventory)', 
-        required=True,
         domain=[('product_tmpl_id.is_hydroponic', '=', True)]
     )
 
