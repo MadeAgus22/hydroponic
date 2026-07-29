@@ -106,6 +106,17 @@ class HydroponicMaturationLine(models.Model):
             if record.talang_id.remaining_capacity < 0:
                 raise ValidationError(f"Talang {record.talang_id.name} Penuh! Kuota tidak cukup.")
 
+    @api.constrains('qty_transfer')
+    def _check_batch_quota(self):
+        """ Mencegah pemindahan tanaman melebihi sisa dari Peremajaan """
+        for record in self:
+            # Hitung total yang dialokasikan di seluruh baris pada batch ini
+            allocated = sum(record.maturation_id.line_ids.mapped('qty_transfer'))
+            
+            # Jika total alokasi lebih besar dari total masuk, munculkan error!
+            if allocated > record.maturation_id.qty_entered:
+                raise ValidationError(f"Alokasi Gagal! Anda mencoba memasukkan total {allocated} tanaman, padahal Total Tanaman Masuk hanya {record.maturation_id.qty_entered}. Sisa kuota tidak cukup!")
+
     @api.constrains('qty_remaining')
     def _check_qty_remaining(self):
         for record in self:
