@@ -11,7 +11,7 @@
                 <field name="estimated_start_date"/>
                 <field name="duration"/>
                 <field name="qty_alive"/>
-                <field name="is_done" widget="boolean_toggle"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'in_progress'" decoration-success="state == 'transferred'"/>
             </list>
         </field>
     </record>
@@ -21,11 +21,12 @@
         <field name="model">hydroponic.juvenile</field>
         <field name="arch" type="xml">
             <form string="Form Peremajaan" create="0">
+                <header>
+                    <field name="state" widget="statusbar" options="{'clickable': '1'}" statusbar_visible="draft,in_progress,transferred"/>
+                </header>
                 <sheet>
                     <div class="oe_title">
-                        <h1>
-                            <field name="seeding_id"/>
-                        </h1>
+                        <h1><field name="seeding_id"/></h1>
                     </div>
                     <group>
                         <group string="Data dari Pembibitan (Read-only)">
@@ -34,12 +35,10 @@
                             <field name="qty_seeding"/>
                         </group>
                         <group string="Proses Peremajaan">
-                            <field name="juvenile_product_id" placeholder="Pilih sayur hasil peremajaan..." 
-                                   readonly="is_done == True" force_save="1"/>
-                            <field name="qty_dead" readonly="is_done == True" force_save="1"/>
-                            <field name="qty_alive" readonly="is_done == True" force_save="1"/>
-                            <field name="duration" readonly="is_done == True" force_save="1"/>
-                            <field name="is_done" widget="boolean_toggle"/>
+                            <field name="juvenile_product_id" placeholder="Pilih sayur hasil peremajaan..." readonly="state == 'transferred'" force_save="1"/>
+                            <field name="qty_dead" readonly="state == 'transferred'" force_save="1"/>
+                            <field name="qty_alive" readonly="state == 'transferred'" force_save="1"/>
+                            <field name="duration" readonly="state == 'transferred'" force_save="1"/>
                         </group>
                     </group>
                 </sheet>
