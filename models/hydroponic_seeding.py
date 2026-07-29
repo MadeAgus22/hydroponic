@@ -97,7 +97,7 @@ class HydroponicSeeding(models.Model):
                         'padding': 4,
                         'number_next': 1,
                         'number_increment': 1,
-                        'implementation': 'no_gap'
+                        'implementation': 'standard'
                     })
                 
                 # 3. Ambil nomor antrian secara paksa menggunakan ID sequence

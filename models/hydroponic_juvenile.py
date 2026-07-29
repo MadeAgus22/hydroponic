@@ -16,7 +16,7 @@ class HydroponicJuvenile(models.Model):
     juvenile_product_id = fields.Many2one(
         'product.product', 
         string='Hasil Sayur Peremajaan', 
-        required=True,
+        # required=True,
         domain=[('product_tmpl_id.is_hydroponic', '=', True)]
     )
 
