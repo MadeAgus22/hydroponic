@@ -39,61 +39,68 @@ class HydroponicJuvenile(models.Model):
     def write(self, vals):
         res = super(HydroponicJuvenile, self).write(vals)
         
-        # SINKRONISASI BALIK: Jika dari sini diklik 'Peremajaan', form Pembibitan otomatis maju
+        # 1. JIKA STATUS DIKLIK "PEREMAJAAN"
         if vals.get('state') == 'in_progress':
             for record in self:
+                # Sinkronisasi mundur ke Pembibitan
                 if record.seeding_id.state != 'transferred':
                     record.seeding_id.state = 'transferred'
-
-        # JIKA PINDAH PENDEWASAAN DIKLIK (Pengganti logika is_done)
-        if vals.get('state') == 'transferred':
-            for record in self:
                 
-                if not record.juvenile_product_id:
-                    raise ValidationError("Gagal menyimpan! Anda harus memilih 'Hasil Sayur Peremajaan' terlebih dahulu sebelum memindahkan ke Pendewasaan.")
-                
+                # Buat draf Pendewasaan OTOMATIS saat masuk masa Peremajaan
                 existing_maturation = self.env['hydroponic.maturation'].search([('juvenile_id', '=', record.id)])
-                
                 if not existing_maturation:
                     self.env['hydroponic.maturation'].create({
                         'juvenile_id': record.id,
+                        'state': 'draft'
                     })
 
-                    company_id = self.env.company.id
-                    stock_loc = self.env['stock.location'].search([('usage', '=', 'internal'), ('company_id', 'in', [company_id, False])], limit=1)
-                    prod_loc = self.env['stock.location'].search([('usage', '=', 'production'), ('company_id', 'in', [company_id, False])], limit=1)
-                    
-                    if stock_loc and prod_loc:
-                        move_out = self.env['stock.move'].sudo().create({
-                            'name': f'Konsumsi Bibit - {record.seeding_id.name}',
-                            'product_id': record.product_id.id,
-                            'product_uom_qty': record.qty_alive,
-                            'product_uom': record.product_id.uom_id.id,
-                            'location_id': stock_loc.id,
-                            'location_dest_id': prod_loc.id,
-                            'company_id': company_id,
-                            'state': 'draft',
-                        })
-                        move_out._action_confirm()
-                        move_out._action_assign()
-                        if hasattr(move_out, 'picked'): move_out.picked = True
-                        move_out.quantity = record.qty_alive
-                        move_out._action_done()
+        # 2. JIKA STATUS DIKLIK "PINDAH PENDEWASAAN"
+        if vals.get('state') == 'transferred':
+            for record in self:
+                if not record.juvenile_product_id:
+                    raise ValidationError("Gagal menyimpan! Anda harus memilih 'Hasil Sayur Peremajaan' terlebih dahulu sebelum memindahkan ke Pendewasaan.")
+                
+                # Logika Inventory: Konsumsi Bibit -> Hasil Peremajaan
+                company_id = self.env.company.id
+                stock_loc = self.env['stock.location'].search([('usage', '=', 'internal'), ('company_id', 'in', [company_id, False])], limit=1)
+                prod_loc = self.env['stock.location'].search([('usage', '=', 'production'), ('company_id', 'in', [company_id, False])], limit=1)
+                
+                if stock_loc and prod_loc:
+                    move_out = self.env['stock.move'].sudo().create({
+                        'name': f'Konsumsi Bibit - {record.seeding_id.name}',
+                        'product_id': record.product_id.id,
+                        'product_uom_qty': record.qty_alive,
+                        'product_uom': record.product_id.uom_id.id,
+                        'location_id': stock_loc.id,
+                        'location_dest_id': prod_loc.id,
+                        'company_id': company_id,
+                        'state': 'draft',
+                    })
+                    move_out._action_confirm()
+                    move_out._action_assign()
+                    if hasattr(move_out, 'picked'): move_out.picked = True
+                    move_out.quantity = record.qty_alive
+                    move_out._action_done()
 
-                        move_in = self.env['stock.move'].sudo().create({
-                            'name': f'Hasil Peremajaan - {record.seeding_id.name}',
-                            'product_id': record.juvenile_product_id.id,
-                            'product_uom_qty': record.qty_alive,
-                            'product_uom': record.juvenile_product_id.uom_id.id,
-                            'location_id': prod_loc.id,
-                            'location_dest_id': stock_loc.id,
-                            'company_id': company_id,
-                            'state': 'draft',
-                        })
-                        move_in._action_confirm()
-                        move_in._action_assign()
-                        if hasattr(move_in, 'picked'): move_in.picked = True
-                        move_in.quantity = record.qty_alive
-                        move_in._action_done()
+                    move_in = self.env['stock.move'].sudo().create({
+                        'name': f'Hasil Peremajaan - {record.seeding_id.name}',
+                        'product_id': record.juvenile_product_id.id,
+                        'product_uom_qty': record.qty_alive,
+                        'product_uom': record.juvenile_product_id.uom_id.id,
+                        'location_id': prod_loc.id,
+                        'location_dest_id': stock_loc.id,
+                        'company_id': company_id,
+                        'state': 'draft',
+                    })
+                    move_in._action_confirm()
+                    move_in._action_assign()
+                    if hasattr(move_in, 'picked'): move_in.picked = True
+                    move_in.quantity = record.qty_alive
+                    move_in._action_done()
+
+                # SINKRONISASI MAJU KE PENDEWASAAN
+                maturation = self.env['hydroponic.maturation'].search([('juvenile_id', '=', record.id)], limit=1)
+                if maturation and maturation.state == 'draft':
+                    maturation.state = 'in_progress'
 
         return res

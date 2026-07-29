@@ -29,7 +29,7 @@
                 <field name="batch_name"/>
                 <field name="juvenile_product_id"/>
                 <field name="qty_unallocated" decoration-warning="qty_unallocated &gt; 0" widget="badge"/>
-                <field name="state" widget="badge" decoration-info="state == 'process'" decoration-success="state == 'done'"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'in_progress'" decoration-primary="state == 'harvest'" decoration-success="state == 'done'"/>
             </list>
         </field>
     </record>
@@ -40,9 +40,16 @@
         <field name="arch" type="xml">
             <form string="Form Pendewasaan" create="0">
                 <header>
-                    <button name="action_start_process" type="object" string="Mulai Masuk Talang" class="oe_highlight" invisible="state != 'draft'"/>
-                    <button name="action_mark_done" type="object" string="Tutup Batch (Selesai)" invisible="state != 'process'"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,process,done"/>
+                    <!-- TOMBOL WIZARD YA/TIDAK -->
+                    <button name="action_force_in_progress" 
+                            type="object" 
+                            string="Langsung Masuk Pendewasaan" 
+                            class="oe_highlight" 
+                            invisible="state != 'draft' or qty_unallocated &lt;= 0"
+                            confirm="Masih ada sisa tanaman yang belum dimasukkan ke talang. Apakah Anda yakin ingin membuang/mengabaikan sisa tersebut dan langsung memulai proses Pendewasaan?"/>
+                            
+                    <!-- Statusbar tetap sama -->
+                    <field name="state" widget="statusbar" options="{'clickable': '1'}" statusbar_visible="draft,in_progress,harvest,done"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
