@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+from odoo.exceptions import ValidationError
 from datetime import timedelta
 
 class HydroponicSeeding(models.Model):
@@ -19,6 +20,7 @@ class HydroponicSeeding(models.Model):
         ('draft', 'Perencanaan'),
         ('in_progress', 'Pembibitan'),
         ('transferred', 'Pindah Peremajaan'),
+        ('done', 'Selesai'),
         ('cancel', 'Gagal/Cancel')
     ], string='Status', default='draft', required=True, copy=False)
 
@@ -68,6 +70,16 @@ class HydroponicSeeding(models.Model):
         return super(HydroponicSeeding, self).create(vals_list)
     
     def write(self, vals):
+        if 'state' in vals and not self.env.context.get('allow_revert'):
+            # 1. Cegah klik manual menuju status Selesai
+            if vals['state'] == 'done':
+                raise ValidationError("Peringatan! Anda tidak boleh mengklik status 'Selesai' secara manual. Status ini akan terisi otomatis setelah semua tanaman habis dipanen di menu Pendewasaan & Panen.")
+            
+            # 2. Cegah klik status lain jika saat ini sudah Selesai (Kunci Mundur)
+            for record in self:
+                if record.state == 'done':
+                    raise ValidationError("Batch ini sudah Selesai secara penuh! Pembatalan/Perubahan status hanya bisa dilakukan melalui menu Pendewasaan & Panen.")
+
         res = super(HydroponicSeeding, self).write(vals)
         
         # Trigger jika status diklik menjadi 'in_progress' (Pembibitan)

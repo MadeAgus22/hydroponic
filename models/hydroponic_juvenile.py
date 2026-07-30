@@ -28,7 +28,8 @@ class HydroponicJuvenile(models.Model):
     state = fields.Selection([
         ('draft', 'Perencanaan'),
         ('in_progress', 'Peremajaan'),
-        ('transferred', 'Pindah Pendewasaan')
+        ('transferred', 'Pindah Pendewasaan'),
+        ('done', 'Selesai')
     ], string='Status', default='draft', required=True)
 
     @api.onchange('qty_dead')
@@ -37,6 +38,16 @@ class HydroponicJuvenile(models.Model):
             self.qty_alive = self.qty_seeding - self.qty_dead
 
     def write(self, vals):
+        if 'state' in vals and not self.env.context.get('allow_revert'):
+            # 1. Cegah klik manual menuju status Selesai
+            if vals['state'] == 'done':
+                raise ValidationError("Peringatan! Anda tidak boleh mengklik status 'Selesai' secara manual. Status ini akan terisi otomatis setelah semua tanaman habis dipanen di menu Pendewasaan & Panen.")
+            
+            # 2. Cegah klik status lain jika saat ini sudah Selesai (Kunci Mundur)
+            for record in self:
+                if record.state == 'done':
+                    raise ValidationError("Batch ini sudah Selesai secara penuh! Pembatalan/Perubahan status hanya bisa dilakukan melalui menu Pendewasaan & Panen.")
+                
         res = super(HydroponicJuvenile, self).write(vals)
         
         # 1. JIKA STATUS DIKLIK "PEREMAJAAN"

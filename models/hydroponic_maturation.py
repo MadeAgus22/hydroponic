@@ -87,6 +87,19 @@ class HydroponicMaturation(models.Model):
             for record in self:
                 if any(not line.is_done for line in record.line_ids):
                     raise ValidationError("Masih ada Talang yang sisa panennya belum 0. Selesaikan semua terlebih dahulu!")
+                record.juvenile_id.with_context(allow_revert=True).state = 'done'
+                record.juvenile_id.seeding_id.with_context(allow_revert=True).state = 'done'
+
+        # 4. JIKA DIBATALKAN MANUAL DARI "SELESAI" KEMBALI KE "MASA PANEN"
+        if vals.get('state') == 'harvest':
+            for record in self:
+                if record.qty_unallocated > 0:
+                    raise ValidationError(f"Belum bisa masuk Masa Panen! Masih ada {record.qty_unallocated} tanaman yang belum dialokasikan ke Talang.")
+                
+                # BUKA KUNCI MUNDUR: Jika status sebelumnya adalah Selesai, kembalikan menu sblmnya ke posisi "Pindah"
+                if record.state == 'done':
+                    record.juvenile_id.with_context(allow_revert=True).state = 'transferred'
+                    record.juvenile_id.seeding_id.with_context(allow_revert=True).state = 'transferred'
 
         return res
 
@@ -219,7 +232,12 @@ class HydroponicHarvestLine(models.Model):
                     move_in.quantity = record.qty_harvested
                     move_in._action_done()
 
-            if record.maturation_id.state == 'in_progress':
-                record.maturation_id.state = 'harvest'
+            maturation = record.maturation_id
+            
+            # Cek apakah setelah diinput, SEMUA talang sisa panennya sudah 0 (Habis)
+            if all(line.is_done for line in maturation.line_ids):
+                maturation.state = 'done'
+            elif maturation.state == 'in_progress':
+                maturation.state = 'harvest'
 
         return records
