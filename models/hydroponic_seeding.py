@@ -15,6 +15,11 @@ class HydroponicSeeding(models.Model):
     qty_seeding = fields.Integer(string='Jumlah Pembibitan', required=True, default=1)
     estimated_transfer_date = fields.Date(string='Estimasi Pindah Tanam', compute='_compute_estimated_transfer_date', store=True)
     
+    actual_start_date = fields.Date(string='Aktual Pembibitan')
+    actual_transfer_date = fields.Date(string='Aktual Pindah Tanam')
+    start_color = fields.Char(compute='_compute_color_status')
+    transfer_color = fields.Char(compute='_compute_color_status')
+
     # Label Pindah Tanam diubah menjadi Pindah Peremajaan
     state = fields.Selection([
         ('draft', 'Perencanaan'),
@@ -80,6 +85,11 @@ class HydroponicSeeding(models.Model):
                 if record.state == 'done':
                     raise ValidationError("Batch ini sudah Selesai secara penuh! Pembatalan/Perubahan status hanya bisa dilakukan melalui menu Pendewasaan & Panen.")
 
+        if vals.get('state') == 'in_progress':
+            vals['actual_start_date'] = fields.Date.context_today(self)
+        if vals.get('state') == 'transferred':
+            vals['actual_transfer_date'] = fields.Date.context_today(self)
+            
         res = super(HydroponicSeeding, self).write(vals)
         
         # Trigger jika status diklik menjadi 'in_progress' (Pembibitan)
@@ -129,3 +139,44 @@ class HydroponicSeeding(models.Model):
                         juv.state = 'in_progress'
                         
         return res
+
+    @api.depends('start_date', 'estimated_transfer_date', 'actual_start_date', 'actual_transfer_date', 'state')
+    def _compute_color_status(self):
+        today = fields.Date.context_today(self)
+        for record in self:
+            if record.state == 'cancel':
+                record.start_color = 'normal'
+                record.transfer_color = 'normal'
+                continue
+
+            # 1. LOGIKA WARNA TANGGAL PEMBIBITAN
+            if record.start_date:
+                if record.state == 'draft': # Masih draf (warna dinamis)
+                    delta = (record.start_date - today).days
+                    if delta < 0: record.start_color = 'danger'     # Lewat hari (Merah)
+                    elif delta == 0: record.start_color = 'success' # Hari H (Hijau)
+                    elif delta == 1: record.start_color = 'warning' # H-1 (Kuning)
+                    else: record.start_color = 'normal'             # Masih lama
+                else: # Sudah dieksekusi (warna terkunci)
+                    compare_date = record.actual_start_date or record.start_date
+                    delta = (record.start_date - compare_date).days
+                    if delta < 0: record.start_color = 'danger'     # Dieksekusi Terlambat
+                    else: record.start_color = 'success'            # Dieksekusi Tepat/Lebih Awal
+            else:
+                record.start_color = 'normal'
+                
+            # 2. LOGIKA WARNA ESTIMASI PINDAH TANAM
+            if record.estimated_transfer_date:
+                if record.state in ['draft', 'in_progress']: # Belum pindah (warna dinamis)
+                    delta = (record.estimated_transfer_date - today).days
+                    if delta < 0: record.transfer_color = 'danger'
+                    elif delta == 0: record.transfer_color = 'success'
+                    elif delta == 1: record.transfer_color = 'warning'
+                    else: record.transfer_color = 'normal'
+                else: # Sudah pindah tanam (warna terkunci)
+                    compare_date = record.actual_transfer_date or record.estimated_transfer_date
+                    delta = (record.estimated_transfer_date - compare_date).days
+                    if delta < 0: record.transfer_color = 'danger'
+                    else: record.transfer_color = 'success'
+            else:
+                record.transfer_color = 'normal'

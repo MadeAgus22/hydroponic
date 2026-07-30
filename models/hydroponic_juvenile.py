@@ -17,6 +17,7 @@ class HydroponicJuvenile(models.Model):
         domain=[('product_tmpl_id.is_hydroponic', '=', True)]
     )
 
+    transfer_color = fields.Char(related='seeding_id.transfer_color')
     estimated_start_date = fields.Date(related='seeding_id.estimated_transfer_date', string='Estimasi Masuk Peremajaan', readonly=True)
     qty_seeding = fields.Integer(related='seeding_id.qty_seeding', string='Jumlah Awal Semai', readonly=True)
     

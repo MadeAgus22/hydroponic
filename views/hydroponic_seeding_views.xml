@@ -7,9 +7,20 @@
             <list string="Daftar Pembibitan">
                 <field name="name"/>
                 <field name="product_id"/>
-                <field name="start_date"/>
+                <field name="start_color" column_invisible="True"/>
+                <field name="transfer_color" column_invisible="True"/>
+                <field name="start_date" 
+                       decoration-danger="start_color == 'danger'" 
+                       decoration-success="start_color == 'success'" 
+                       decoration-warning="start_color == 'warning'"/>
+                       
+                <field name="estimated_transfer_date" 
+                       decoration-danger="transfer_color == 'danger'" 
+                       decoration-success="transfer_color == 'success'" 
+                       decoration-warning="transfer_color == 'warning'"/>
+                <!-- <field name="start_date"/> -->
                 <field name="duration"/>
-                <field name="estimated_transfer_date"/>
+                <!-- <field name="estimated_transfer_date"/> -->
                 <field name="qty_seeding"/>
                 <field name="state" widget="badge" 
                        decoration-info="state == 'draft'" 

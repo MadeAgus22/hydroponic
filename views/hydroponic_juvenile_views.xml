@@ -5,10 +5,15 @@
         <field name="model">hydroponic.juvenile</field>
         <field name="arch" type="xml">
             <list string="Daftar Peremajaan" create="0">
+                <field name="transfer_color" column_invisible="True"/>
                 <field name="seeding_id"/>
                 <field name="product_id"/>
                 <field name="juvenile_product_id"/>
-                <field name="estimated_start_date"/>
+                <!-- <field name="estimated_start_date"/> -->
+                <field name="estimated_start_date" 
+                       decoration-danger="transfer_color == 'danger'" 
+                       decoration-success="transfer_color == 'success'" 
+                       decoration-warning="transfer_color == 'warning'"/>
                 <field name="duration"/>
                 <field name="qty_alive"/>
                 <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'in_progress'" decoration-primary="state == 'transferred'" decoration-success="state == 'done'"/>
