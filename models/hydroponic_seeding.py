@@ -47,6 +47,7 @@ class HydroponicSeeding(models.Model):
             1: 'JAN', 2: 'FEB', 3: 'MAR', 4: 'APR', 5: 'MEI', 6: 'JUN',
             7: 'JUL', 8: 'AGU', 9: 'SEP', 10: 'OKT', 11: 'NOV', 12: 'DES'
         }
+        
         for vals in vals_list:
             if vals.get('name', 'New') == 'New':
                 start_date_val = vals.get('start_date') or fields.Date.context_today(self)
@@ -54,26 +55,36 @@ class HydroponicSeeding(models.Model):
                     start_date = fields.Date.from_string(start_date_val)
                 else:
                     start_date = start_date_val
+                
                 month_string = months_map.get(start_date.month, 'TXT')
+                year_str = start_date.strftime('%Y')
+                month_str = start_date.strftime('%m')
+                
+                # 1. Buat kode antrian unik per bulan dan tahun (Contoh: hydroponic.batch.2026.09)
+                seq_code = f'hydroponic.seeding.batch.{year_str}.{month_str}'
                 
                 Sequence = self.env['ir.sequence'].sudo()
-                seq = Sequence.search([('code', '=', 'hydroponic.seeding.batch')], limit=1)
+                seq = Sequence.search([('code', '=', seq_code)], limit=1)
                 
+                # 2. Jika antrian untuk bulan tersebut belum ada, buat baru dari 0001
                 if not seq:
                     seq = Sequence.create({
-                        'name': 'Nomor Urut Batch Pembibitan (Auto)',
-                        'code': 'hydroponic.seeding.batch',
+                        'name': f'Batch Pembibitan {month_string} {year_str}',
+                        'code': seq_code,
                         'padding': 4,
                         'number_next': 1,
                         'number_increment': 1,
                         'implementation': 'standard'
                     })
                 
+                # 3. Tarik nomor murni (hanya angka, misal: '0001')
                 seq_number = seq.next_by_id()
+                
+                # 4. Gabungkan teks bulan dan angka murni
                 vals['name'] = f"{month_string}/{seq_number}"
                 
         return super(HydroponicSeeding, self).create(vals_list)
-    
+        
     def write(self, vals):
         if 'state' in vals and not self.env.context.get('allow_revert'):
             # 1. Cegah klik manual menuju status Selesai
