@@ -18,9 +18,7 @@
                        decoration-danger="transfer_color == 'danger'" 
                        decoration-success="transfer_color == 'success'" 
                        decoration-warning="transfer_color == 'warning'"/>
-                <!-- <field name="start_date"/> -->
                 <field name="duration"/>
-                <!-- <field name="estimated_transfer_date"/> -->
                 <field name="qty_seeding"/>
                 <field name="state" widget="badge" 
                        decoration-info="state == 'draft'" 
@@ -43,7 +41,7 @@
                             invisible="state in ('transferred', 'cancel')"/>
                     
                     <field name="state" widget="statusbar" options="{'clickable': '1'}" 
-                           statusbar_visible="draft,in_progress,transferred,done"/>
+                            statusbar_visible="draft,in_progress,transferred,done"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -71,6 +69,54 @@
         </field>
     </record>
 
+    
+    <record id="view_hydroponic_seeding_calendar" model="ir.ui.view">
+        <field name="name">hydroponic.seeding.calendar</field>
+        <field name="model">hydroponic.seeding</field>
+        <field name="arch" type="xml">
+            <calendar string="Kalender Pembibitan" date_start="start_date" date_stop="estimated_transfer_date" color="state" mode="month">
+                <field name="name"/>
+                <field name="product_id"/>
+                <field name="qty_seeding"/>
+            </calendar>
+        </field>
+    </record>
+
+    
+    <record id="view_hydroponic_seeding_kanban" model="ir.ui.view">
+        <field name="name">hydroponic.seeding.kanban</field>
+        <field name="model">hydroponic.seeding</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="product_id"/>
+                <field name="qty_seeding"/>
+                <field name="start_date"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click">
+                            <div class="oe_kanban_details">
+                                <strong class="o_kanban_record_title">
+                                    <field name="name"/>
+                                </strong>
+                                <div>
+                                    Tanaman: <field name="product_id"/>
+                                </div>
+                                <div>
+                                    Jumlah: <field name="qty_seeding"/>
+                                </div>
+                                <div>
+                                    Mulai: <field name="start_date"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
     <record id="view_hydroponic_seeding_search" model="ir.ui.view">
         <field name="name">hydroponic.seeding.search</field>
         <field name="model">hydroponic.seeding</field>
@@ -78,7 +124,7 @@
             <search>
                 <field name="name" string="Kode Batch"/>
                 <field name="product_id" string="Nama Sayuran"/>
-                <filter string="Sembunyikan Gagal" name="hide_cancel" domain="[('state', '!=', 'cancel')]"/>
+                <filter string="Sembunyikan Gagal" name="hide_cancel" domain="<('state', '!=', 'cancel')>"/>
             </search>
         </field>
     </record>
@@ -86,8 +132,9 @@
     <record id="action_hydroponic_seeding" model="ir.actions.act_window">
         <field name="name">Pembibitan (Seeding)</field>
         <field name="res_model">hydroponic.seeding</field>
-        <field name="view_mode">list,form</field>
-        <field name="context">{'search_default_hide_cancel': 1}</field>
+        
+        <field name="view_mode">kanban,list,form,calendar</field>
+        <field name="context">{'search_default_hide_cancel': 1}
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Belum ada data pembibitan.
@@ -95,5 +142,5 @@
                 Klik tombol "New" untuk memulai pencatatan batch pembibitan baru Anda.
             </p>
         </field>
-    </record>
+    </record> 
 </odoo>
